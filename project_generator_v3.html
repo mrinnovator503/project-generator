@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Student Project Generator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root{
+  --bg:#f2f4f7;
+  --card:#ffffff;
+  --accent:#1f3cff;
+  --text:#1f2937;
+  --muted:#6b7280;
+  --danger:#dc2626;
+  --radius:14px;
+  --shadow:0 10px 25px rgba(0,0,0,.08);
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family:Inter,system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+}
+
+.container{
+  max-width:1200px;
+  margin:auto;
+  padding:24px;
+}
+
+header{text-align:center;margin-bottom:24px}
+header h1{margin:0;font-size:2.3rem}
+header p{color:var(--muted)}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:20px;
+}
+
+.card{
+  background:var(--card);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:18px;
+  border:3px solid transparent;
+}
+
+.card.locked{border-color:var(--danger)}
+
+.card h3{
+  margin:0 0 8px;
+  font-size:.9rem;
+  color:var(--muted);
+  text-transform:uppercase;
+}
+
+.value{
+  font-size:1.4rem;
+  font-weight:600;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.value.updating{
+  opacity:0;
+  transform:translateY(6px);
+}
+
+.lock-btn{
+  margin-top:12px;
+  border-radius:999px;
+  border:2px solid var(--muted);
+  background:none;
+  padding:6px 14px;
+  cursor:pointer;
+}
+
+.card.locked .lock-btn{
+  border-color:var(--danger);
+  color:var(--danger);
+}
+
+.controls{text-align:center;margin:24px 0}
+
+button.primary{
+  background:var(--accent);
+  color:white;
+  border:none;
+  padding:14px 28px;
+  font-size:1.1rem;
+  border-radius:999px;
+  cursor:pointer;
+  box-shadow:var(--shadow);
+}
+
+button.secondary{
+  background:none;
+  border:2px solid var(--accent);
+  color:var(--accent);
+  padding:10px 18px;
+  border-radius:999px;
+  cursor:pointer;
+  margin:5px;
+}
+
+.section{
+  background:white;
+  padding:20px;
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  margin-top:24px;
+}
+
+.hidden{display:none}
+
+input,textarea{
+  width:100%;
+  padding:10px;
+  margin-top:10px;
+  border-radius:8px;
+  border:1px solid #ccc;
+}
+
+canvas{display:none}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<header>
+  <h1>Student Project Generator</h1>
+  <p>Generate • Confirm • Present • Share</p>
+</header>
+
+<!-- CARDS -->
+<div class="grid">
+  <div class="card" data-key="user">
+    <h3>User</h3>
+    <div class="value" id="user">—</div>
+    <button class="lock-btn">🔓 Unlock</button>
+  </div>
+
+  <div class="card" data-key="setting">
+    <h3>Setting</h3>
+    <div class="value" id="setting">—</div>
+    <button class="lock-btn">🔓 Unlock</button>
+  </div>
+
+  <div class="card" data-key="condition">
+    <h3>Condition</h3>
+    <div class="value" id="condition">—</div>
+    <button class="lock-btn">🔓 Unlock</button>
+  </div>
+
+  <div class="card" data-key="constraint">
+    <h3>Constraint</h3>
+    <div class="value" id="constraint">—</div>
+    <button class="lock-btn">🔓 Unlock</button>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="primary" id="generateBtn">Generate Challenge</button>
+  <button class="secondary" id="confirmBtn">Confirm & Lock</button>
+</div>
+
+<!-- CHALLENGE -->
+<div class="section">
+  <strong>Challenge</strong>
+  <p id="sentence"></p>
+</div>
+
+<!-- EXPLAIN -->
+<div class="controls">
+  <button class="secondary" id="explainBtn">📘 Explain the Problem</button>
+</div>
+
+<div class="section hidden" id="explainBox">
+  <p id="explanation"></p>
+</div>
+
+<!-- TEAM MODE -->
+<div class="section hidden" id="teamBox">
+  <h3>Team Mode (Final)</h3>
+  <input id="teamName" placeholder="Team Name">
+  <input id="schoolName" placeholder="School / Institution">
+  <input id="members" placeholder="Team Members">
+  <textarea id="idea" placeholder="Idea summary (2–3 lines)"></textarea>
+
+  <div class="controls">
+    <button class="primary" id="makeCardBtn">Generate Challenge Card</button>
+  </div>
+</div>
+
+<canvas id="canvas" width="900" height="1100"></canvas>
+
+</div>
+
+<script>
+const decks={
+user:["Grandmother","Farmer","Astronaut","Firefighter","Duck","Elephant","Student","Doctor"],
+setting:["Science Lab","Staircase","Farm Field","Zoo Enclosure","Classroom"],
+condition:["Low Light","Object Too Close","Gas Leak","High Temperature"],
+constraint:["Must be low-cost","Must be battery powered","Must use only 2 sensors"]
+};
+
+const state={};
+
+function rand(arr,key){
+let v;
+do{v=arr[Math.floor(Math.random()*arr.length)]}
+while(state[key]?.value===v);
+return v;
+}
+
+document.querySelectorAll(".card").forEach(card=>{
+const key=card.dataset.key;
+state[key]={value:null,locked:false};
+const valueEl=card.querySelector(".value");
+const lockBtn=card.querySelector(".lock-btn");
+
+valueEl.onclick=()=>{
+if(state[key].locked)return;
+updateCard(key,valueEl);
+};
+
+lockBtn.onclick=()=>{
+state[key].locked=!state[key].locked;
+card.classList.toggle("locked");
+lockBtn.textContent=state[key].locked?"🔒 Locked":"🔓 Unlock";
+};
+});
+
+function updateCard(key,el){
+el.classList.add("updating");
+setTimeout(()=>{
+state[key].value=rand(decks[key],key);
+el.textContent=state[key].value;
+el.classList.remove("updating");
+renderSentence();
+},150);
+}
+
+function generateAll(){
+for(const k in state){
+if(!state[k].locked){
+updateCard(k,document.getElementById(k));
+}
+}
+}
+
+function renderSentence(){
+sentence.innerHTML=
+`Build a device for a <strong>${state.user.value}</strong> in the
+<strong>${state.setting.value}</strong> that deals with
+<strong>${state.condition.value}</strong>.<br>
+<strong>Constraint:</strong> ${state.constraint.value}`;
+}
+
+document.getElementById("generateBtn").onclick=generateAll;
+
+document.getElementById("confirmBtn").onclick=()=>{
+if(!window.confirm("Once confirmed, the challenge cannot be changed. Continue?"))return;
+
+for(const k in state){state[k].locked=true;}
+
+document.querySelectorAll(".card").forEach(c=>{
+c.classList.add("locked");
+c.querySelector(".lock-btn").textContent="🔒 Locked";
+c.querySelector(".lock-btn").disabled=true;
+});
+
+document.getElementById("generateBtn").disabled=true;
+document.getElementById("teamBox").classList.remove("hidden");
+};
+
+document.getElementById("explainBtn").onclick=()=>{
+explainBox.classList.toggle("hidden");
+explanation.textContent=
+`The user faces a problem in the ${state.setting.value} when ${state.condition.value}.
+The device must detect this and respond while following the constraint: ${state.constraint.value}.`;
+};
+
+document.getElementById("makeCardBtn").onclick=()=>{
+const c=document.getElementById("canvas");
+const ctx=c.getContext("2d");
+ctx.fillStyle="#fff";
+ctx.fillRect(0,0,c.width,c.height);
+
+ctx.fillStyle="#000";
+ctx.font="bold 32px Inter";
+ctx.fillText("STUDENT PROJECT CHALLENGE",40,60);
+
+ctx.font="22px Inter";
+ctx.fillText(sentence.textContent,40,130);
+
+ctx.font="18px Inter";
+ctx.fillText("Team: "+teamName.value,40,260);
+ctx.fillText("School: "+schoolName.value,40,290);
+ctx.fillText("Idea: "+idea.value,40,330);
+
+const link=document.createElement("a");
+link.download="challenge-card.png";
+link.href=c.toDataURL();
+link.click();
+};
+
+generateAll();
+</script>
+
+</body>
+</html>
